@@ -64,6 +64,6 @@ weather = pd.DataFrame({
 # Run the model with the corrected DataFrame input
 modelchain.run_model(weather)
 
-# Plot the AC power output
+# Plot the DC power output
 modelchain.results.dc.plot(figsize=(16,9))
 plt.show()
