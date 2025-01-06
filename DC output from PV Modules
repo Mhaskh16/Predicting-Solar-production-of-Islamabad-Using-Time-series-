@@ -1,0 +1,69 @@
+import pvlib
+from pvlib.modelchain import ModelChain
+from pvlib.location import Location
+from pvlib.pvsystem import PVSystem
+from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
+import pandas as pd
+import matplotlib.pyplot as plt
+from pvlib.solarposition import get_solarposition
+
+# Load the data
+
+tmy = pd.read_csv('Forecasting.csv', index_col=0)
+tmy.index = pd.to_datetime(tmy.index,)
+
+# Check data ranges
+#print(tmy.describe())
+
+# Extract data correctly
+ghi = tmy['ghi']
+dhi = tmy['dhi']
+dni = tmy['dni']
+temp_air = tmy['temp_air']
+wind_speed = tmy['wind_speed']
+
+# Check for zero values
+if ghi.sum() == 0 or dni.sum() == 0:
+    print("Warning: Zero irradiance values detected!")
+
+
+    
+# Create location and system
+location = Location(latitude=53.372163, longitude=-1.494494, tz='Europe/Berlin', altitude=80, name='Example')
+sandia_modules = pvlib.pvsystem.retrieve_sam('SandiaMod')
+cec_inverters = pvlib.pvsystem.retrieve_sam('CECInverter')
+
+Panels = sandia_modules['Canadian_Solar_CS5P_220M___2009_']
+Inverter = cec_inverters['iPower__SHO_5_2__240V_']
+temp_Para = TEMPERATURE_MODEL_PARAMETERS['sapm']['open_rack_glass_glass']
+
+
+
+# Define the PV system
+system = PVSystem(surface_tilt=45, surface_azimuth=190,
+                  module_parameters=Panels, inverter_parameters=Inverter,
+                  temperature_model_parameters=temp_Para,
+                  modules_per_string=15, strings_per_inverter=8)
+
+
+modelchain = ModelChain(system, location)
+
+# Prepare the data in the correct format for ModelChain
+weather = pd.DataFrame({
+    'ghi': ghi,
+    'dhi': dhi,
+    'dni': dni,
+    'temp_air': temp_air,
+    'wind_speed': wind_speed
+})
+
+
+
+
+
+# Run the model with the corrected DataFrame input
+modelchain.run_model(weather)
+
+# Plot the AC power output
+modelchain.results.dc.plot(figsize=(16,9))
+plt.show()
