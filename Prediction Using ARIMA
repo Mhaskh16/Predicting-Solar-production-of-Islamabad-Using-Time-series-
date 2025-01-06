@@ -1,0 +1,288 @@
+import pandas as pd
+import numpy as np
+from statsmodels.tsa.arima.model import ARIMA
+import pmdarima as pm
+import matplotlib.pyplot as plt
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.stattools import acf ,pacf
+from pmdarima import auto_arima
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+#Access the dataset file
+file_path = r'D:\HU Documents\Project\Data For Project\poa_data_Irrr.csv'
+data = pd.read_csv(file_path)
+#setting date as index and format setting
+data['Date'] = pd.to_datetime(data['Date'], format='%d/%m/%Y')
+data.set_index('Date', inplace=True)
+data = data.asfreq('D')
+#getting Familiar with DataSet by visual representation and Details
+data.info()
+data.plot(figsize=(12,5))
+#Split data set in Training and Testing
+split_date = data.index[-31]
+data_train = data[data.index < split_date].copy()
+data_test = data[data.index >= split_date].copy()
+#for easy access to variables in Dataset
+temp = data['TempAir']
+wind_speed = data['Wind_speed']
+Ghi = data['Ghi']
+dhi = data['dhi']
+dni = data['dni']
+#Creating a Function to check stationarity of Variables in Data Set
+def check_stationarity(series):
+    result = adfuller(series, autolag='AIC')
+    dfoutput = pd.Series (result[0:4], index=['Test Stats','P value', 'Lags used','Number of observation'] )
+
+    for key,value in result [4].items():
+        dfoutput['Critical value (%s)' %key] = value
+        
+    print(dfoutput)
+#Checking Stationarity
+print("The result for ADF for Temperature")
+check_stationarity(temp)
+print("The result for ADF for Wind Speed")
+check_stationarity(wind_speed)
+print("The result for ADF for Ghi")
+check_stationarity(Ghi)
+print("The result for ADF for dhi")
+check_stationarity(dhi)
+print("The result for ADF for dni")
+check_stationarity(dni)
+#Performing Differencing to Temperature to make it Stationary and Checking Stationary again
+temp_train_diff= temp_train.diff().dropna()
+temp_train_diff.head()
+print("The result for ADF for diff Temperature")
+check_stationarity(temp_train_diff)
+temp_train_diff.info()
+#Performing ACF and PACF for Temperature
+seasonal_diff_lagAcf = acf(temp_train_diff, nlags=70)
+seasonal_diff_lagPacf = pacf(temp_train_diff, nlags=2, method='ols')
+
+#plot ACF
+plt.subplot(121)
+plt.plot(seasonal_diff_lagAcf)
+plt.axhline(y=0, linestyle='--', color='grey')
+plt.axhline(y=-1.96/np.sqrt(len(temp_train_diff)),linestyle='--',color='grey')
+plt.axhline(y=1.96/np.sqrt(len(temp_train_diff)),linestyle='--',color='grey')
+plt.title('Auto Correlation Function')
+
+#plot PACF
+plt.subplot(122)
+plt.plot(seasonal_diff_lagPacf)
+plt.axhline(y=0, linestyle='--', color='grey')
+plt.axhline(y=-1.96/np.sqrt(len(temp_train_diff)),linestyle='--',color='grey')
+plt.axhline(y=1.96/np.sqrt(len(temp_train_diff)),linestyle='--',color='grey')
+plt.title('Partial Auto Correlation Function')
+#Performing ACF and PACF for Wind Speed,
+def Acf_Pacf(series):
+    from statsmodels.tsa.stattools import acf ,pacf
+    lagAcf = acf(series, nlags=20)
+    lagPacf = pacf(series, nlags=5, method='ols')
+
+    #plot ACF
+    plt.subplot(121)
+    plt.plot(lagAcf)
+    plt.axhline(y=0, linestyle='--', color='grey')
+    plt.axhline(y=-1.96/np.sqrt(len(series)),linestyle='--',color='grey')
+    plt.axhline(y=1.96/np.sqrt(len(series)),linestyle='--',color='grey')
+    plt.title('Auto Correlation Function')
+    
+    #plot PACF
+    plt.subplot(122)
+    plt.plot(lagPacf)
+    plt.axhline(y=0, linestyle='--', color='grey')
+    plt.axhline(y=-1.96/np.sqrt(len(series)),linestyle='--',color='grey')
+    plt.axhline(y=1.96/np.sqrt(len(series)),linestyle='--',color='grey')
+    plt.title('Partial Auto Correlation Function')
+Acf_Pacf(data_train['Wind_speed'])
+#Performing ACF and PACF for Global Horizontal Irradiance, Direct Normal Irradiance and Diffuse Horizontal Irradiance
+Acf_Pacf(data_train['Ghi'])
+Acf_Pacf(data_train['dhi'])
+Acf_Pacf(data_train['dni'])
+# for Auto Arima to  double check the values of P and Q
+def aarima(series):
+    result = auto_arima(series,trace=True)
+    print(result)
+aarima(data_train['Wind_speed'])
+aarima(data_train['Ghi'])
+aarima(data_train['dhi'])
+aarima(data_train['dni'])
+#Creating an ARIMA Function to set the values for Training model and residuals and density's ACF and PACF
+def Model_fit (series, order):
+    model = ARIMA(series, order=order)
+    model_fit = model.fit()
+    print(model_fit.summary())
+    residuals = model_fit.resid[1:]
+    fig,ax = plt.subplots(1,2)
+    residuals.plot(title='Residuals', ax=ax[0])
+    residuals.plot(title='Density', kind='kde',ax=ax[1])
+    plt.show()
+    acf_original = plot_acf(residuals)
+    pacf_original = plot_pacf(residuals)
+    return(model_fit)
+
+Temp_order= (5,1,2)
+Temp_model_fit = Model_fit(temp_train,Temp_order)
+
+wind_order= (5,0,2)
+Wind_model_fit = Model_fit(data_train['Wind_speed'],wind_order)
+
+Ghi_order=(11,0,2)
+Ghi_model_fit = Model_fit(data_train['Ghi'],Ghi_order)
+
+dhi_order= (13,0,2)
+dhi_model_fit = Model_fit(data_train['dhi'],dhi_order)
+
+dni_order= (20,0,5)
+dni_model_fit = Model_fit(data_train['dni'],dni_order)
+
+#to visualize the fitting values on original 
+try:
+    # Specify the ARIMA model
+    temp_model = ARIMA(temp_train, order=(88, 1, 1))  
+    temp_result_AR = temp_model.fit()  # Correctly call the fit method
+
+    # Access fitted values
+    temp_fitted_values = temp_result_AR.fittedvalues
+
+    # Plotting
+    plt.figure(figsize=(10, 5))
+    plt.plot(temp_train_diff, label='Original Data', color='blue')
+    plt.plot(temp_fitted_values, label='Fitted Values', color='red')
+   # plt.title('ARIMA Model Fitted Values RSS: %.4f'% sum((min_fitted_values-tempmin_logScale)**2))
+    plt.legend()
+    plt.show()
+    
+except Exception as e:
+    print(f"An error occurred: {e}")
+try:
+    # Specify the ARIMA model
+    wind_model = ARIMA(data_train['Wind_speed'], order=(5, 0, 2))  
+    wind_result_AR = wind_model.fit()  # Correctly call the fit method
+
+    # Access fitted values
+    wind_fitted_values = wind_result_AR.fittedvalues
+
+    # Plotting
+    plt.figure(figsize=(10, 5))
+    plt.plot(data_train['Wind_speed'], label='Original Data', color='blue')
+    plt.plot(wind_fitted_values, label='Fitted Values', color='red')
+   # plt.title('ARIMA Model Fitted Values RSS: %.4f'% sum((min_fitted_values-tempmin_logScale)**2))
+    plt.legend()
+    plt.show()
+    
+except Exception as e:
+    print(f"An error occurred: {e}")
+try:
+    # Specify the ARIMA model
+    ghi_model = ARIMA(data_train['Ghi'], order=(11, 0, 2))  
+    ghi_result_AR = ghi_model.fit()  # Correctly call the fit method
+
+    # Access fitted values
+    ghi_fitted_values = ghi_result_AR.fittedvalues
+
+    # Plotting
+    plt.figure(figsize=(10, 5))
+    plt.plot(data_train['Ghi'], label='Original Data', color='blue')
+    plt.plot(ghi_fitted_values, label='Fitted Values', color='red')
+   # plt.title('ARIMA Model Fitted Values RSS: %.4f'% sum((min_fitted_values-tempmin_logScale)**2))
+    plt.legend()
+    plt.show()
+    
+except Exception as e:
+    print(f"An error occurred: {e}")
+
+try:
+    # Specify the ARIMA model
+    dhi_model = ARIMA(data_train['dhi'], order=(13, 0, 2))  
+    dhi_result_AR = dhi_model.fit()  # Correctly call the fit method
+
+    # Access fitted values
+    dhi_fitted_values = dhi_result_AR.fittedvalues
+
+    # Plotting
+    plt.figure(figsize=(10, 5))
+    plt.plot(data_train['dhi'], label='Original Data', color='blue')
+    plt.plot(dhi_fitted_values, label='Fitted Values', color='red')
+   # plt.title('ARIMA Model Fitted Values RSS: %.4f'% sum((min_fitted_values-tempmin_logScale)**2))
+    plt.legend()
+    plt.show()
+    
+except Exception as e:
+    print(f"An error occurred: {e}")
+
+try:
+    # Specify the ARIMA model
+    dni_model = ARIMA(data_train['dni'], order=(20, 0, 5))  
+    dni_result_AR = dni_model.fit()  # Correctly call the fit method
+
+    # Access fitted values
+    dni_fitted_values = dni_result_AR.fittedvalues
+
+    # Plotting
+    plt.figure(figsize=(10, 5))
+    plt.plot(data_train['dni'], label='Original Data', color='blue')
+    plt.plot(dni_fitted_values, label='Fitted Values', color='red')
+   # plt.title('ARIMA Model Fitted Values RSS: %.4f'% sum((min_fitted_values-tempmin_logScale)**2))
+    plt.legend()
+    plt.show()
+    
+except Exception as e:
+    print(f"An error occurred: {e}")
+
+#Forecasting and printing the 31 days values Temperature
+forecast_temp = Temp_model_fit.forecast(len(data_test['TempAir']))
+data['Forecast Manual'] = [None]*len(data_train['TempAir']) + list(forecast_temp)
+forecast_temp.plot(figsize=(12,5))
+data_test['TempAir'].plot(figsize=(12,5))
+print(forecast_temp)
+
+#Forecasting and printing the 31 days values Wind Speed
+forecast_wind = Wind_model_fit.forecast(len(data_test['Wind_speed']))
+data['Forecast Manual'] = [None]*len(data_train['Wind_speed']) + list(forecast_wind)
+forecast_wind.plot(figsize=(12,5))
+data_test['Wind_speed'].plot(figsize=(12,5))
+print(forecast_wind)
+
+#Forecasting and printing the 31 days values Ghi
+forecast_Ghi = Ghi_model_fit.forecast(len(data_test['Ghi']))
+data['Ghi Forecast Manual'] = [None]*len(data_train['Ghi']) + list(forecast_Ghi)
+forecast_Ghi.plot(figsize=(12,5))
+data_test['Ghi'].plot(figsize=(12,5))
+print(forecast_Ghi)
+
+#Forecasting and printing the 31 days values dhi
+forecast_dhi = dhi_model_fit.forecast(len(data_test['dhi']))
+data['dhi Forecast Manual'] = [None]*len(data_train['dhi']) + list(forecast_dhi)
+forecast_dhi.plot(figsize=(12,5))
+data_test['dhi'].plot(figsize=(12,5))
+print(forecast_dhi)
+plt.legend()
+plt.show()
+
+#Forecasting and printing the 31 days values dni
+forecast_dni = dni_model_fit.forecast(len(data_test['dni']))
+data['dni Forecast Manual'] = [None]*len(data_train['dni']) + list(forecast_dhi)
+forecast_dni.plot(figsize=(12,5))
+data_test['dni'].plot(figsize=(12,5))
+print(forecast_dni)
+
+#Saving all the Predicted Values to a File
+print(len(data_test.index))
+print(len(forecast_temp))
+print(len(forecast_wind))
+print(len(forecast_Ghi))
+print(len(forecast_dni))
+
+forecast_Data = pd.DataFrame({
+    
+    'Date': data_test.index,
+     'forecast temp': forecast_temp.values,
+    'forecast Wind_Speed': forecast_wind.values,
+    'forecast_Ghi': forecast_Ghi.values,
+    'forecast_dhi': forecast_dhi.values,
+    'forecast_dni': forecast_dni.values,
+  
+})
+output_path = r'D:\HU Documents\Project\Data For Project\forecast_dec.xlsx'
+forecast_Data.to_excel(output_path, index=False)
+print(f"Forecast for December 2024 saved successfully to {output_path}")
