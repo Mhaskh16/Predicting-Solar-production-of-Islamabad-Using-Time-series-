@@ -23,3 +23,17 @@ wind_speed = data['Wind_speed']
 Ghi = data['Ghi']
 dhi = data['dhi']
 dni = data['dni']
+
+split_date = data.index[-31]
+
+data_train = data[data.index < split_date].copy()
+data_test = data[data.index >= split_date].copy()
+
+# Augmented Dickey-Fuller test
+result = adfuller(temp_train)
+print(f"ADF Statistic: {result[0]}")
+print(f"p-value: {result[1]}")
+if result[1] <= 0.05:
+    print("Data is stationary (reject null hypothesis)")
+else:
+    print("Data is NOT stationary (fail to reject null hypothesis)")
