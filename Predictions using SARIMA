@@ -18,3 +18,8 @@ data.set_index('Date', inplace=True)
 data.info()
 data.plot(figsize=(12,5))
 
+temp = data['TempAir']
+wind_speed = data['Wind_speed']
+Ghi = data['Ghi']
+dhi = data['dhi']
+dni = data['dni']
