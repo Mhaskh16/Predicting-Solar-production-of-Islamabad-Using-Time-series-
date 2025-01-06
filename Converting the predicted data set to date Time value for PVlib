@@ -1,0 +1,20 @@
+import pvlib
+from pvlib.modelchain import ModelChain
+from pvlib.location import Location
+from pvlib.pvsystem import PVSystem
+from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
+import pandas as pd
+import matplotlib.pyplot as plt
+from pvlib.solarposition import get_solarposition
+
+file_path = r'D:\HU Documents\Project\Data For Project\Book1.xlsx'
+data = pd.read_excel(file_path, usecols=["Date","temp","windspeed","ghi","dhi","dni"],
+                     index_col=0)
+
+print(data)  
+data.plot(figsize=(16,9))
+
+data.index = pd.date_range(start = "01/01/2023 09:00", end ="31/12/2023 09:00", freq="D")
+data.columns = ["wind_speed","temp_air","dni","dhi","ghi"]
+
+data.to_csv("Forecasting.csv")
