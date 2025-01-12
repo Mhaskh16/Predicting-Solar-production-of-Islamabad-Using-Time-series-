@@ -9,26 +9,32 @@ from statsmodels.tsa.stattools import acf ,pacf
 from pmdarima import auto_arima
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from statsmodels.tsa.statespace.sarimax import SARIMAX
+
 #Access the dataset file
 file_path = r'D:\HU Documents\Project\Data For Project\poa_data_Irrr.csv'
 data = pd.read_csv(file_path)
+
 #setting date as index and format setting
 data['Date'] = pd.to_datetime(data['Date'], format='%d/%m/%Y')
 data.set_index('Date', inplace=True)
 data = data.asfreq('D')
+
 #getting Familiar with DataSet by visual representation and Details
 data.info()
 data.plot(figsize=(12,5))
+
 #Split data set in Training and Testing
 split_date = data.index[-31]
 data_train = data[data.index < split_date].copy()
 data_test = data[data.index >= split_date].copy()
+
 #for easy access to variables in Dataset
 temp = data['TempAir']
 wind_speed = data['Wind_speed']
 Ghi = data['Ghi']
 dhi = data['dhi']
 dni = data['dni']
+
 #spliting Temperature train and test
 split_temp = temp.index[-31]
 
@@ -45,6 +51,7 @@ def check_stationarity(series):
         dfoutput['Critical value (%s)' %key] = value
         
     print(dfoutput)
+
 #Checking Stationarity
 print("The result for ADF for Temperature")
 check_stationarity(temp)
@@ -56,31 +63,35 @@ print("The result for ADF for dhi")
 check_stationarity(dhi)
 print("The result for ADF for dni")
 check_stationarity(dni)
+        
+
 #Performing Differencing to Temperature to make it Stationary and Checking Stationary again
 temp_train_seasonal_diff = temp_train.diff(365).dropna()
 
 print("The result for ADF for diff Temperature")
-check_stationarity(temp_train_diff)
-temp_train_diff.info()
+check_stationarity(temp_train_seasonal_diff)
+temp_train_seasonal_diff.info()
+
 #Performing ACF and PACF for Temperature
-seasonal_diff_lagAcf = acf(temp_train_diff, nlags=70)
-seasonal_diff_lagPacf = pacf(temp_train_diff, nlags=2, method='ols')
+seasonal_diff_lagAcf = acf(temp_train_seasonal_diff, nlags=7)
+seasonal_diff_lagPacf = pacf(temp_train_seasonal_diff, nlags=2, method='ols')
 
 #plot ACF
 plt.subplot(121)
 plt.plot(seasonal_diff_lagAcf)
 plt.axhline(y=0, linestyle='--', color='grey')
-plt.axhline(y=-1.96/np.sqrt(len(temp_train_diff)),linestyle='--',color='grey')
-plt.axhline(y=1.96/np.sqrt(len(temp_train_diff)),linestyle='--',color='grey')
+plt.axhline(y=-1.96/np.sqrt(len(temp_train_seasonal_diff)),linestyle='--',color='grey')
+plt.axhline(y=1.96/np.sqrt(len(temp_train_seasonal_diff)),linestyle='--',color='grey')
 plt.title('Auto Correlation Function')
 
 #plot PACF
 plt.subplot(122)
 plt.plot(seasonal_diff_lagPacf)
 plt.axhline(y=0, linestyle='--', color='grey')
-plt.axhline(y=-1.96/np.sqrt(len(temp_train_diff)),linestyle='--',color='grey')
-plt.axhline(y=1.96/np.sqrt(len(temp_train_diff)),linestyle='--',color='grey')
+plt.axhline(y=-1.96/np.sqrt(len(temp_train_seasonal_diff)),linestyle='--',color='grey')
+plt.axhline(y=1.96/np.sqrt(len(temp_train_seasonal_diff)),linestyle='--',color='grey')
 plt.title('Partial Auto Correlation Function')
+
 #Performing ACF and PACF for Wind Speed,
 def Acf_Pacf(series):
     from statsmodels.tsa.stattools import acf ,pacf
@@ -115,6 +126,7 @@ aarima(data_train['Wind_speed'])
 aarima(data_train['Ghi'])
 aarima(data_train['dhi'])
 aarima(data_train['dni'])
+
 #Creating an ARIMA Function to set the values for Training model and residuals and density's ACF and PACF
 def Model_fit (series, order):
     model = ARIMA(series, order=order)
@@ -128,10 +140,11 @@ def Model_fit (series, order):
     acf_original = plot_acf(residuals)
     pacf_original = plot_pacf(residuals)
     return(model_fit)
+
 #performing SARIMA for Temperature
 
 model = SARIMAX(temp_train ,
-                order=(7, 1, 2),
+                order=(30, 1, 2),
                 seasonal_order=(1, 1, 1, 31),
                 enforce_stationarity=False,
                 enforce_invertibility=False)
@@ -158,6 +171,7 @@ try:
     
 except Exception as e:
     print(f"An error occurred: {e}")
+
 
 wind_order= (5,0,2)
 Wind_model_fit = Model_fit(data_train['Wind_speed'],wind_order)
@@ -246,6 +260,7 @@ try:
     
 except Exception as e:
     print(f"An error occurred: {e}")
+
 #Forecasting and printing the 31 days values Temperature
 forecast_steps = 31
 forecast = sarima_result_temp.get_forecast(steps=forecast_steps)
@@ -302,7 +317,7 @@ print(forecast_dni)
 
 #just to check the len of data ind
 print(len(data_test.index))
-print(len(forecast_temp))
+print(len(forecast_mean_temp))
 print(len(forecast_wind))
 print(len(forecast_Ghi))
 print(len(forecast_dni))
@@ -311,7 +326,8 @@ print(len(forecast_dni))
 forecast_Data = pd.DataFrame({
     
     'Date': data_test.index,
-     'forecast temp': forecast_temp.values,
+     'forecast temp': forecast_mean_temp.values,
+    
     'forecast Wind_Speed': forecast_wind.values,
     'forecast_Ghi': forecast_Ghi.values,
     'forecast_dhi': forecast_dhi.values,
